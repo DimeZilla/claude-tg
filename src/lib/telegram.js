@@ -1,43 +1,43 @@
 'use strict';
 
-var https = require('https');
+const https = require('https');
 
-function sendMessage(botToken, chatId, text, options) {
-  options = options || {};
-
-  var payload = JSON.stringify({
+function sendMessage(botToken, chatId, text, options = {}) {
+  const payload = JSON.stringify({
     chat_id: chatId,
-    text: text,
+    text,
     parse_mode: options.parseMode || 'HTML',
     disable_web_page_preview: true,
   });
 
-  return new Promise(function (resolve, reject) {
-    var req = https.request(
+  return new Promise((resolve, reject) => {
+    const req = https.request(
       {
         hostname: 'api.telegram.org',
-        path: '/bot' + botToken + '/sendMessage',
+        path: `/bot${botToken}/sendMessage`,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
         },
       },
-      function (res) {
-        var body = '';
-        res.on('data', function (chunk) {
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => {
           body += chunk;
         });
-        res.on('end', function () {
+        res.on('end', () => {
           try {
-            var parsed = JSON.parse(body);
+            const parsed = JSON.parse(body);
             if (parsed.ok) {
               resolve(parsed);
             } else {
-              reject(new Error('Telegram API error: ' + (parsed.description || body)));
+              reject(
+                new Error(`Telegram API error: ${parsed.description || body}`)
+              );
             }
-          } catch (e) {
-            reject(new Error('Invalid JSON from Telegram: ' + body));
+          } catch (_e) {
+            reject(new Error(`Invalid JSON from Telegram: ${body}`));
           }
         });
       }
@@ -49,18 +49,21 @@ function sendMessage(botToken, chatId, text, options) {
   });
 }
 
-function sendMessageWithRetry(botToken, chatId, text, options, retries) {
-  retries = retries === undefined ? 2 : retries;
-  options = options || {};
-
-  return sendMessage(botToken, chatId, text, options).catch(function (err) {
+function sendMessageWithRetry(
+  botToken,
+  chatId,
+  text,
+  options = {},
+  retries = 2
+) {
+  return sendMessage(botToken, chatId, text, options).catch((err) => {
     if (retries > 0) {
-      var delay = (3 - retries) * 500;
-      return new Promise(function (resolve) {
+      const delay = (3 - retries) * 500;
+      return new Promise((resolve) => {
         setTimeout(resolve, delay);
-      }).then(function () {
-        return sendMessageWithRetry(botToken, chatId, text, options, retries - 1);
-      });
+      }).then(() =>
+        sendMessageWithRetry(botToken, chatId, text, options, retries - 1)
+      );
     }
     throw err;
   });

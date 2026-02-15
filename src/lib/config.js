@@ -14,7 +14,9 @@ function loadConfig() {
     throw new Error('BOT_TOKEN is not set. Run "npm run setup" first.');
   }
   if (!/^\d+:[A-Za-z0-9_-]{35,}$/.test(botToken)) {
-    throw new Error('BOT_TOKEN format is invalid. Should look like: 123456:ABC-DEF...');
+    throw new Error(
+      'BOT_TOKEN format is invalid. Should look like: 123456:ABC-DEF...'
+    );
   }
 
   return {
@@ -35,7 +37,7 @@ function saveChatId(chatId) {
   const id = String(chatId);
 
   if (!fs.existsSync(ENV_PATH)) {
-    fs.writeFileSync(ENV_PATH, 'CHAT_ID=' + id + '\n');
+    fs.writeFileSync(ENV_PATH, `CHAT_ID=${id}\n`);
     return;
   }
 
@@ -43,16 +45,16 @@ function saveChatId(chatId) {
   const lines = contents.split('\n');
   let found = false;
 
-  const updated = lines.map(function (line) {
+  const updated = lines.map((line) => {
     if (line.startsWith('CHAT_ID=')) {
       found = true;
-      return 'CHAT_ID=' + id;
+      return `CHAT_ID=${id}`;
     }
     return line;
   });
 
   if (!found) {
-    updated.push('CHAT_ID=' + id);
+    updated.push(`CHAT_ID=${id}`);
   }
 
   fs.writeFileSync(ENV_PATH, updated.join('\n'));
