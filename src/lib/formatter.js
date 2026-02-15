@@ -2,17 +2,24 @@
 
 function escapeHtml(text) {
   if (!text) return '';
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
-function formatNotification(hookData, sessionName, screenContent, showHint, isTranscript) {
-  var notificationType = hookData.notification_type;
-  var message = hookData.message;
-  var title = hookData.title;
+function formatNotification(
+  hookData,
+  sessionName,
+  screenContent,
+  showHint,
+  isTranscript
+) {
+  const { notification_type: notificationType, message, title } = hookData;
 
-  var sessionTag = sessionName ? '[' + escapeHtml(sessionName) + '] ' : '';
+  const sessionTag = sessionName ? `[${escapeHtml(sessionName)}] ` : '';
 
-  var icon, header;
+  let icon, header;
   if (notificationType === 'permission_prompt') {
     icon = '\uD83D\uDD10';
     header = 'Permission needed';
@@ -24,16 +31,13 @@ function formatNotification(hookData, sessionName, screenContent, showHint, isTr
     header = 'Waiting for input';
   }
 
-  var parts = [
-    icon + ' ' + sessionTag + '<b>' + escapeHtml(header) + '</b>',
-  ];
+  const parts = [`${icon} ${sessionTag}<b>${escapeHtml(header)}</b>`];
 
-  if (title) parts.push('<b>' + escapeHtml(title) + '</b>');
+  if (title) parts.push(`<b>${escapeHtml(title)}</b>`);
   if (message) parts.push(escapeHtml(message));
 
-  // Show the last Claude message
   if (screenContent) {
-    var displayText;
+    let displayText;
     if (isTranscript) {
       displayText = screenContent;
     } else if (notificationType === 'permission_prompt') {
@@ -42,11 +46,12 @@ function formatNotification(hookData, sessionName, screenContent, showHint, isTr
       displayText = extractLastMessage(screenContent);
     }
     if (displayText) {
-      var truncated = displayText.length > 3200
-        ? '...\n' + displayText.slice(-3200)
-        : displayText;
+      const truncated =
+        displayText.length > 3200
+          ? `...\n${displayText.slice(-3200)}`
+          : displayText;
       parts.push('');
-      parts.push('<pre>' + escapeHtml(truncated) + '</pre>');
+      parts.push(`<pre>${escapeHtml(truncated)}</pre>`);
     }
   }
 
@@ -64,12 +69,11 @@ function formatNotification(hookData, sessionName, screenContent, showHint, isTr
 
 // Extract the permission dialog from the bottom of the terminal
 function extractPermissionDialog(screen) {
-  var lines = screen.split('\n');
+  const lines = screen.split('\n');
 
-  // Work backwards from the bottom to find the permission dialog.
-  // The dialog sits below the last horizontal rule separator (─ or ━).
-  var separatorIndex = -1;
-  for (var i = lines.length - 1; i >= 0; i--) {
+  // Work backwards to find the last horizontal rule separator
+  let separatorIndex = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
     if (/^[─━╌╍┄┅┈┉]{5,}/.test(lines[i].trim())) {
       separatorIndex = i;
       break;
@@ -77,15 +81,16 @@ function extractPermissionDialog(screen) {
   }
 
   if (separatorIndex >= 0) {
-    // Take everything below the separator
-    var dialogLines = lines.slice(separatorIndex + 1);
-    var text = dialogLines.join('\n').trim();
+    const text = lines
+      .slice(separatorIndex + 1)
+      .join('\n')
+      .trim();
     if (text) return text;
   }
 
   // Fallback: grab last 15 non-empty lines from bottom
-  var tail = [];
-  for (var j = lines.length - 1; j >= 0 && tail.length < 15; j--) {
+  const tail = [];
+  for (let j = lines.length - 1; j >= 0 && tail.length < 15; j--) {
     if (lines[j].trim()) tail.unshift(lines[j]);
   }
   return tail.join('\n');
@@ -93,11 +98,10 @@ function extractPermissionDialog(screen) {
 
 // Extract the last Claude response (● block) from terminal output
 function extractLastMessage(screen) {
-  var lines = screen.split('\n');
+  const lines = screen.split('\n');
 
-  // Find the last line starting with ● (Claude's response marker)
-  var lastResponseStart = -1;
-  for (var i = lines.length - 1; i >= 0; i--) {
+  let lastResponseStart = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
     if (/^\s*●/.test(lines[i])) {
       lastResponseStart = i;
       break;
@@ -105,20 +109,16 @@ function extractLastMessage(screen) {
   }
 
   if (lastResponseStart === -1) {
-    // No ● found — just return the last few non-empty lines
-    var tail = [];
-    for (var j = lines.length - 1; j >= 0 && tail.length < 10; j--) {
+    const tail = [];
+    for (let j = lines.length - 1; j >= 0 && tail.length < 10; j--) {
       if (lines[j].trim()) tail.unshift(lines[j]);
     }
     return tail.join('\n');
   }
 
-  // Collect from ● until the next ❯ prompt or end of output
-  var result = [];
-  for (var k = lastResponseStart; k < lines.length; k++) {
-    // Stop if we hit a user prompt line (but not on the first line)
+  const result = [];
+  for (let k = lastResponseStart; k < lines.length; k++) {
     if (k > lastResponseStart && /^\s*❯/.test(lines[k])) break;
-    // Stop if we hit the horizontal rule separator
     if (/^[─━]{10,}/.test(lines[k].trim())) break;
     result.push(lines[k]);
   }
@@ -126,4 +126,9 @@ function extractLastMessage(screen) {
   return result.join('\n').trim();
 }
 
-module.exports = { formatNotification, escapeHtml };
+module.exports = {
+  formatNotification,
+  escapeHtml,
+  extractPermissionDialog,
+  extractLastMessage,
+};
