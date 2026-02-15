@@ -1,0 +1,20 @@
+{
+  "name": "claude-tg",
+  "version": "1.0.0",
+  "description": "Bridge Claude Code with Telegram for two-way communication",
+  "main": "src/bot.js",
+  "bin": {
+    "claude-tg": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/bot.js",
+    "setup": "node src/setup.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "node-telegram-bot-api": "^0.67.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
