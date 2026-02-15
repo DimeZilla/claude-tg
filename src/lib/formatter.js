@@ -33,8 +33,14 @@ function formatNotification(hookData, sessionName, screenContent, showHint, isTr
 
   // Show the last Claude message
   if (screenContent) {
-    // Transcript content is already clean text; terminal output needs parsing
-    var displayText = isTranscript ? screenContent : extractLastMessage(screenContent);
+    var displayText;
+    if (isTranscript) {
+      displayText = screenContent;
+    } else if (notificationType === 'permission_prompt') {
+      displayText = extractPermissionDialog(screenContent);
+    } else {
+      displayText = extractLastMessage(screenContent);
+    }
     if (displayText) {
       var truncated = displayText.length > 3200
         ? '...\n' + displayText.slice(-3200)
@@ -47,11 +53,42 @@ function formatNotification(hookData, sessionName, screenContent, showHint, isTr
   parts.push('');
   if (showHint) {
     parts.push('<i>Tip: /stop to interrupt, /help for commands</i>');
+  } else if (notificationType === 'permission_prompt') {
+    parts.push('<i>/allow to approve, /deny to reject</i>');
   } else {
     parts.push('<i>Reply here to send input</i>');
   }
 
   return parts.join('\n');
+}
+
+// Extract the permission dialog from the bottom of the terminal
+function extractPermissionDialog(screen) {
+  var lines = screen.split('\n');
+
+  // Work backwards from the bottom to find the permission dialog.
+  // The dialog sits below the last horizontal rule separator (─ or ━).
+  var separatorIndex = -1;
+  for (var i = lines.length - 1; i >= 0; i--) {
+    if (/^[─━╌╍┄┅┈┉]{5,}/.test(lines[i].trim())) {
+      separatorIndex = i;
+      break;
+    }
+  }
+
+  if (separatorIndex >= 0) {
+    // Take everything below the separator
+    var dialogLines = lines.slice(separatorIndex + 1);
+    var text = dialogLines.join('\n').trim();
+    if (text) return text;
+  }
+
+  // Fallback: grab last 15 non-empty lines from bottom
+  var tail = [];
+  for (var j = lines.length - 1; j >= 0 && tail.length < 15; j--) {
+    if (lines[j].trim()) tail.unshift(lines[j]);
+  }
+  return tail.join('\n');
 }
 
 // Extract the last Claude response (● block) from terminal output

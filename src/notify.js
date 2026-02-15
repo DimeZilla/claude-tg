@@ -61,7 +61,12 @@ async function main() {
   if (notificationType === 'permission_prompt' && !cfg.notifyOn.permission) process.exit(0);
 
   // Throttle idle_prompt per IDLE_COOLDOWN setting
-  if (notificationType === 'idle_prompt' && !idleCooldownExpired(cfg)) {
+  if (notificationType === 'idle_prompt' && !cooldownExpired(cfg, 'lastIdle')) {
+    process.exit(0);
+  }
+
+  // Throttle permission_prompt: only send once per cooldown period
+  if (notificationType === 'permission_prompt' && !cooldownExpired(cfg, 'lastPermission')) {
     process.exit(0);
   }
 
@@ -72,57 +77,73 @@ async function main() {
   }
 
   // Get the last Claude message to show what it's asking/saying.
-  // Prefer transcript (structured, reliable) over tmux capture (fragile with UI elements).
+  // For permission_prompt, always use tmux capture to show the actual dialog.
+  // For other types, prefer transcript (structured) over tmux (fragile).
   var screenContent = '';
+  var isTranscriptContent = false;
 
-  if (hookData.transcript_path) {
-    try {
-      var lastMsg = transcript.getLastAssistantMessage(hookData.transcript_path);
-      if (lastMsg) {
-        screenContent = lastMsg;
+  if (notificationType === 'permission_prompt') {
+    // Show the actual permission dialog from the terminal
+    if (sessionName) {
+      try {
+        screenContent = tmux.capturePane(sessionName, 50).trim();
+      } catch (e) {
+        // ignore capture failures
       }
-    } catch (e) {
-      // ignore
     }
-  }
+  } else {
+    if (hookData.transcript_path) {
+      try {
+        var lastMsg = transcript.getLastAssistantMessage(hookData.transcript_path);
+        if (lastMsg) {
+          screenContent = lastMsg;
+          isTranscriptContent = true;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
 
-  // Fall back to tmux capture if no transcript available
-  if (!screenContent && sessionName) {
-    try {
-      screenContent = tmux.capturePane(sessionName, 50).trim();
-    } catch (e) {
-      // ignore capture failures
+    // Fall back to tmux capture if no transcript available
+    if (!screenContent && sessionName) {
+      try {
+        screenContent = tmux.capturePane(sessionName, 50).trim();
+      } catch (e) {
+        // ignore capture failures
+      }
     }
   }
 
   // Check if we should show a hint (3+ notifications in 60 seconds)
   var showHint = shouldShowHint();
 
-  var isTranscript = !!screenContent && !!(hookData.transcript_path);
+  var isTranscript = isTranscriptContent;
   var message = formatter.formatNotification(hookData, sessionName, screenContent, showHint, isTranscript);
   await telegram.sendMessageWithRetry(cfg.botToken, cfg.chatId, message);
 
-  // Record that we sent an idle notification (for cooldown)
+  // Record cooldown timestamp for this notification type
+  var log = loadLog();
   if (notificationType === 'idle_prompt') {
-    var log = loadLog();
     log.lastIdle = Date.now();
-    saveLog(log);
+  } else if (notificationType === 'permission_prompt') {
+    log.lastPermission = Date.now();
   }
+  saveLog(log);
 }
 
-function idleCooldownExpired(cfg) {
+function cooldownExpired(cfg, key) {
   var cooldownMs = (cfg.idleCooldown || 180) * 1000;
   var now = Date.now();
   var log = loadLog();
-  var lastIdle = log.lastIdle || 0;
-  return (now - lastIdle) >= cooldownMs;
+  var last = log[key] || 0;
+  return (now - last) >= cooldownMs;
 }
 
 function loadLog() {
   try {
     return JSON.parse(fs.readFileSync(NOTIFY_LOG_PATH, 'utf8'));
   } catch (e) {
-    return { timestamps: [], lastIdle: 0 };
+    return { timestamps: [], lastIdle: 0, lastPermission: 0 };
   }
 }
 

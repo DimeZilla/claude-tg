@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
+var fs = require('fs');
+var path = require('path');
 var TelegramBot = require('node-telegram-bot-api');
 var config = require('./lib/config');
 var tmux = require('./lib/tmux');
@@ -29,11 +31,21 @@ bot.on('message', function (msg) {
     return;
   }
 
+  // Handle photos
+  if (msg.photo && msg.photo.length > 0) {
+    handlePhoto(chatId, msg);
+    return;
+  }
+
   var text = msg.text;
   if (!text) return;
 
   if (text === '/stop') {
     handleStop(chatId);
+  } else if (text === '/allow') {
+    handleAllow(chatId);
+  } else if (text === '/deny') {
+    handleDeny(chatId);
   } else if (text === '/escape') {
     handleEscape(chatId);
   } else if (text === '/status') {
@@ -44,6 +56,8 @@ bot.on('message', function (msg) {
     handleSessions(chatId);
   } else if (text.indexOf('/switch') === 0) {
     handleSwitch(chatId, text);
+  } else if (text.indexOf('/rename') === 0) {
+    handleRename(chatId, text);
   } else if (text === '/help') {
     handleHelp(chatId);
   } else {
@@ -77,6 +91,56 @@ function handleInput(chatId, text) {
   } catch (err) {
     bot.sendMessage(chatId, '\u274C Failed to send: ' + err.message);
   }
+}
+
+function handlePhoto(chatId, msg) {
+  var active = getActiveSession();
+  if (!active) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F No active sessions. Start one with: <code>claude-tg</code>', { parse_mode: 'HTML' });
+    return;
+  }
+
+  if (!tmux.sessionExists(active)) {
+    sessions.unregister(active);
+    bot.sendMessage(chatId, '\u26A0\uFE0F Session <code>' + formatter.escapeHtml(active) + '</code> is no longer running.', { parse_mode: 'HTML' });
+    return;
+  }
+
+  // Get highest resolution photo (last in array)
+  var photo = msg.photo[msg.photo.length - 1];
+  var caption = msg.caption || '';
+
+  // Save to ~/.claude/claude-tg/uploads/ (shared ephemeral directory)
+  var uploadsDir = path.join(process.env.HOME, '.claude', 'claude-tg', 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  bot.getFile(photo.file_id).then(function (fileInfo) {
+    var ext = path.extname(fileInfo.file_path || '') || '.jpg';
+    var filename = 'telegram-' + Date.now() + ext;
+    var savePath = path.join(uploadsDir, filename);
+
+    return bot.downloadFile(photo.file_id, uploadsDir).then(function (downloadedPath) {
+      // downloadFile saves with original name, rename to our filename
+      if (downloadedPath !== savePath) {
+        fs.renameSync(downloadedPath, savePath);
+      }
+
+      // Send the file path (with caption) as input to Claude
+      var input = caption
+        ? caption + ' (see image: ' + savePath + ')'
+        : 'Please look at this image: ' + savePath;
+
+      tmux.sendKeys(active, input);
+      bot.sendMessage(chatId,
+        '\uD83D\uDCF7 [' + formatter.escapeHtml(active) + '] Saved photo to <code>' + formatter.escapeHtml(filename) + '</code> and sent to Claude.',
+        { parse_mode: 'HTML' }
+      );
+    });
+  }).catch(function (err) {
+    bot.sendMessage(chatId, '\u274C Failed to download photo: ' + err.message);
+  });
 }
 
 function handleStatus(chatId) {
@@ -161,6 +225,45 @@ function handleScreen(chatId) {
   }
 }
 
+function handleRename(chatId, text) {
+  var parts = text.split(/\s+/);
+  var newName = parts[1];
+
+  if (!newName) {
+    bot.sendMessage(chatId, 'Usage: <code>/rename my-project</code>', { parse_mode: 'HTML' });
+    return;
+  }
+
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(newName)) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F Invalid name. Use only letters, numbers, and hyphens.');
+    return;
+  }
+
+  var active = getActiveSession();
+  if (!active) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F No active sessions.');
+    return;
+  }
+
+  // Check for collision
+  var info = sessions.list();
+  if (info.sessions[newName]) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F Name <code>' + formatter.escapeHtml(newName) + '</code> is already in use.', { parse_mode: 'HTML' });
+    return;
+  }
+
+  try {
+    tmux.renameSession(active, newName);
+    sessions.rename(active, newName);
+    bot.sendMessage(chatId,
+      '\u2705 Renamed <code>' + formatter.escapeHtml(active) + '</code> \u2192 <code>' + formatter.escapeHtml(newName) + '</code>',
+      { parse_mode: 'HTML' }
+    );
+  } catch (err) {
+    bot.sendMessage(chatId, '\u274C Failed to rename: ' + err.message);
+  }
+}
+
 function handleStop(chatId) {
   var active = getActiveSession();
   if (!active) {
@@ -177,6 +280,54 @@ function handleStop(chatId) {
     tmux.sendInterrupt(active);
     bot.sendMessage(chatId,
       '\u23F9 [' + formatter.escapeHtml(active) + '] Sent Ctrl+C',
+      { parse_mode: 'HTML' }
+    );
+  } catch (err) {
+    bot.sendMessage(chatId, '\u274C Failed: ' + err.message);
+  }
+}
+
+function handleAllow(chatId) {
+  var active = getActiveSession();
+  if (!active) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F No active sessions.');
+    return;
+  }
+
+  if (!tmux.sessionExists(active)) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F Session not found.');
+    return;
+  }
+
+  try {
+    // Permission prompt: press Enter to accept the default (Allow)
+    tmux.sendEnter(active);
+    bot.sendMessage(chatId,
+      '\u2705 [' + formatter.escapeHtml(active) + '] Approved permission',
+      { parse_mode: 'HTML' }
+    );
+  } catch (err) {
+    bot.sendMessage(chatId, '\u274C Failed: ' + err.message);
+  }
+}
+
+function handleDeny(chatId) {
+  var active = getActiveSession();
+  if (!active) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F No active sessions.');
+    return;
+  }
+
+  if (!tmux.sessionExists(active)) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F Session not found.');
+    return;
+  }
+
+  try {
+    // Permission prompt: press Escape to deny
+    tmux.sendEscape(active);
+    bot.sendMessage(chatId,
+      '\u274C [' + formatter.escapeHtml(active) + '] Denied permission',
       { parse_mode: 'HTML' }
     );
   } catch (err) {
@@ -211,15 +362,18 @@ function handleHelp(chatId) {
   bot.sendMessage(chatId, [
     '<b>claude-tg commands:</b>',
     '',
+    '/allow - Approve a permission prompt',
+    '/deny - Deny a permission prompt',
     '/stop - Send Ctrl+C to interrupt Claude',
     '/escape - Send Escape key',
     '/status - Show all active sessions',
     '/sessions - Same as /status',
     '/switch &lt;name&gt; - Switch active session',
+    '/rename &lt;name&gt; - Rename the active session',
     '/screen - Show recent terminal output',
     '/help - Show this message',
     '',
-    'Any other message is sent as input to the active Claude Code session.',
+    'Any other text is sent as input to the active Claude session.',
   ].join('\n'), { parse_mode: 'HTML' });
 }
 

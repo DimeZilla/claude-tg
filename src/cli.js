@@ -20,8 +20,41 @@ require('dotenv').config({ path: ENV_PATH });
 
 var sessions = require('./lib/sessions');
 
-// Collect args to pass through to claude
-var claudeArgs = process.argv.slice(2);
+// Parse --name from args, pass the rest through to claude
+var allArgs = process.argv.slice(2);
+var customName = null;
+var claudeArgs = [];
+
+for (var i = 0; i < allArgs.length; i++) {
+  if (allArgs[i] === '--name' && i + 1 < allArgs.length) {
+    customName = allArgs[i + 1];
+    i++; // skip the value
+  } else {
+    claudeArgs.push(allArgs[i]);
+  }
+}
+
+// Validate custom name if provided
+if (customName) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(customName)) {
+    console.error('Invalid session name: "' + customName + '". Use only letters, numbers, and hyphens.');
+    process.exit(1);
+  }
+  var existing = sessions.load();
+  if (existing.sessions[customName] && tmuxSessionExists(customName)) {
+    console.error('Session "' + customName + '" already exists. Pick a different name or use /rename from Telegram.');
+    process.exit(1);
+  }
+}
+
+function tmuxSessionExists(name) {
+  try {
+    childProcess.execFileSync('tmux', ['has-session', '-t', name], { stdio: 'ignore' });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 function startBot() {
   if (fs.existsSync(PID_PATH)) {
@@ -73,7 +106,11 @@ function main() {
   try {
     childProcess.execFileSync('which', ['tmux'], { stdio: 'ignore' });
   } catch (e) {
-    console.error('tmux is required but not installed. Install it with: sudo apt install tmux');
+    if (process.platform === 'darwin') {
+      console.error('tmux is required but not installed. Install it with: brew install tmux');
+    } else {
+      console.error('tmux is required but not installed. Install it with: sudo apt install tmux');
+    }
     process.exit(1);
   }
 
@@ -88,8 +125,8 @@ function main() {
   // Start the bot (shared across all sessions)
   startBot();
 
-  // Auto-assign a unique session name
-  var sessionName = sessions.nextName();
+  // Use custom name or auto-assign
+  var sessionName = customName || sessions.nextName();
 
   // Build the claude command
   var claudeCmd = 'claude';

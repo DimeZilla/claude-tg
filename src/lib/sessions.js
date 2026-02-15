@@ -119,6 +119,21 @@ function list() {
   };
 }
 
+// Rename a session (updates key in sessions.json)
+function rename(oldName, newName) {
+  var state = load();
+  if (!state.sessions[oldName]) return false;
+  if (state.sessions[newName]) return false;
+
+  state.sessions[newName] = state.sessions[oldName];
+  delete state.sessions[oldName];
+  if (state.active === oldName) {
+    state.active = newName;
+  }
+  save(state);
+  return true;
+}
+
 module.exports = {
   load: load,
   save: save,
@@ -129,5 +144,6 @@ module.exports = {
   setActive: setActive,
   getActive: getActive,
   list: list,
+  rename: rename,
   SESSIONS_PATH: SESSIONS_PATH,
 };

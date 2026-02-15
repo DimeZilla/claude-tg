@@ -16,6 +16,9 @@ function sessionExists(sessionName) {
 function sendKeys(sessionName, text, targetPane) {
   var target = targetPane || sessionName;
 
+  // Clear any existing unsubmitted text on the line first
+  childProcess.execFileSync('tmux', ['send-keys', '-t', target, 'C-u']);
+
   // -l sends literal text (no tmux key interpretation)
   // -- prevents text starting with - from being parsed as flags
   childProcess.execFileSync('tmux', ['send-keys', '-t', target, '-l', '--', text]);
@@ -58,4 +61,8 @@ function sendEnter(sessionName, targetPane) {
   childProcess.execFileSync('tmux', ['send-keys', '-t', target, 'Enter']);
 }
 
-module.exports = { sessionExists, sendKeys, capturePane, sendInterrupt, sendEscape, sendArrowDown, sendEnter };
+function renameSession(oldName, newName) {
+  childProcess.execFileSync('tmux', ['rename-session', '-t', oldName, newName]);
+}
+
+module.exports = { sessionExists, sendKeys, capturePane, sendInterrupt, sendEscape, sendArrowDown, sendEnter, renameSession };
