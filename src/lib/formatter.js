@@ -72,9 +72,7 @@ function formatNotification(
       return `/<b>${o.number}</b> ${escapeHtml(o.label)}`;
     });
     parts.push(optLines.join('\n'));
-    if (notificationType === 'permission_prompt') {
-      parts.push('<i>/deny to reject</i>');
-    }
+    parts.push('<i>/escape to cancel</i>');
   } else if (notificationType === 'permission_prompt') {
     parts.push('<i>/allow to approve, /deny to reject</i>');
   } else if (notificationType === 'elicitation_dialog') {

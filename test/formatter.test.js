@@ -190,7 +190,7 @@ describe('formatNotification', () => {
 
     expect(result).toContain('/<b>1</b> Yes, accept all');
     expect(result).toContain('/<b>2</b> No, reject');
-    expect(result).toContain('/deny to reject');
+    expect(result).toContain('/escape to cancel');
     expect(result).not.toContain('/allow to approve');
   });
 
@@ -206,7 +206,7 @@ describe('formatNotification', () => {
 
     expect(result).toContain('/<b>1</b> Option A');
     expect(result).toContain('/<b>2</b> Option B');
-    expect(result).not.toContain('/deny');
+    expect(result).toContain('/escape to cancel');
   });
 
   it('formats idle prompt with hourglass', () => {
