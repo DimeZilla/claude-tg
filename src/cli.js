@@ -7,7 +7,8 @@ const fs = require('fs');
 
 const PROJECT_ROOT = path.join(__dirname, '..');
 const BOT_SCRIPT = path.join(__dirname, 'bot.js');
-const LOG_PATH = path.join(PROJECT_ROOT, 'bot.log');
+const LOGS_DIR = path.join(PROJECT_ROOT, 'logs');
+const LOG_PATH = path.join(LOGS_DIR, 'bot.log');
 const PID_PATH = path.join(PROJECT_ROOT, '.bot.pid');
 
 const ENV_PATH = path.join(PROJECT_ROOT, '.env');
@@ -21,6 +22,7 @@ if (!fs.existsSync(ENV_PATH)) {
 require('dotenv').config({ path: ENV_PATH });
 
 const sessions = require('./lib/sessions');
+const { logEvent, logError } = require('./lib/logger');
 
 // Parse --name from args, pass the rest through to claude
 const allArgs = process.argv.slice(2);
@@ -76,6 +78,11 @@ function startBot() {
     }
   }
 
+  try {
+    fs.mkdirSync(LOGS_DIR, { recursive: true });
+  } catch (_e) {
+    // ignore
+  }
   const logFd = fs.openSync(LOG_PATH, 'a');
   const child = childProcess.spawn('node', [BOT_SCRIPT], {
     cwd: PROJECT_ROOT,
@@ -86,6 +93,7 @@ function startBot() {
 
   child.unref();
   fs.writeFileSync(PID_PATH, String(child.pid));
+  logEvent(null, `bot started (pid ${child.pid})`);
   console.log(`Bot started (pid ${child.pid})`);
   return child.pid;
 }
@@ -106,6 +114,7 @@ function stopBotIfNoSessions() {
   } catch (_e) {
     // ignore
   }
+  logEvent(null, 'bot stopped (no active sessions)');
   console.log('Bot stopped (no active sessions).');
 }
 
@@ -150,6 +159,7 @@ function main() {
   }
 
   sessions.register(sessionName, process.cwd());
+  logEvent(sessionName, 'session started');
   console.log(`Starting Claude Code in session: ${sessionName}`);
 
   try {
@@ -162,6 +172,7 @@ function main() {
     // user detached or claude exited
   }
 
+  logEvent(sessionName, 'session stopped');
   sessions.unregister(sessionName);
   stopBotIfNoSessions();
 }

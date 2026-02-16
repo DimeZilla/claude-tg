@@ -8,6 +8,7 @@ const config = require('./lib/config');
 const tmux = require('./lib/tmux');
 const formatter = require('./lib/formatter');
 const sessions = require('./lib/sessions');
+const { logEvent, logError } = require('./lib/logger');
 
 const cfg = config.loadConfig();
 const bot = new TelegramBot(cfg.botToken, { polling: true });
@@ -45,6 +46,12 @@ bot.on('message', (msg) => {
 
   const text = msg.text;
   if (!text) return;
+
+  var active = getActiveSession();
+  if (text.startsWith('/')) {
+    var cmd = text.split(/\s+/)[0];
+    logEvent(active, `command: ${cmd}`);
+  }
 
   if (text === '/stop') {
     handleStop(chatId);
@@ -99,12 +106,14 @@ function handleInput(chatId, text) {
 
   try {
     tmux.sendKeys(active, text);
+    logEvent(active, 'input sent to tmux');
     bot.sendMessage(
       chatId,
       `\uD83D\uDCE4 [${formatter.escapeHtml(active)}] Sent:\n<code>${formatter.escapeHtml(text)}</code>`,
       { parse_mode: 'HTML' }
     );
   } catch (err) {
+    logError(active, `sendKeys failed: ${err.message}`);
     bot.sendMessage(chatId, `\u274C Failed to send: ${err.message}`);
   }
 }
@@ -171,6 +180,7 @@ function handlePhoto(chatId, msg) {
         });
     })
     .catch((err) => {
+      logError(active, `photo download failed: ${err.message}`);
       bot.sendMessage(
         chatId,
         `\u274C Failed to download photo: ${err.message}`
@@ -271,6 +281,7 @@ function handleScreen(chatId) {
       { parse_mode: 'HTML' }
     );
   } catch (err) {
+    logError(active, `screen capture failed: ${err.message}`);
     bot.sendMessage(chatId, `\u274C Failed to capture screen: ${err.message}`);
   }
 }
@@ -319,6 +330,7 @@ function handleRename(chatId, text) {
       { parse_mode: 'HTML' }
     );
   } catch (err) {
+    logError(active, `rename failed: ${err.message}`);
     bot.sendMessage(chatId, `\u274C Failed to rename: ${err.message}`);
   }
 }
@@ -443,6 +455,7 @@ function handleHelp(chatId) {
 }
 
 function shutdown() {
+  logEvent(null, 'bot shutting down');
   console.log('Shutting down...');
   bot.stopPolling();
   process.exit(0);
@@ -457,13 +470,16 @@ bot.on('polling_error', (err) => {
     err.response &&
     err.response.statusCode === 409
   ) {
+    logError(null, 'duplicate bot instance detected, exiting');
     console.error(
       'ERROR: Another bot instance is running ' +
         'with the same token. Exiting.'
     );
     process.exit(1);
   }
+  logError(null, `polling error: ${err.message}`);
   console.error('Polling error:', err.message);
 });
 
+logEvent(null, 'bot started');
 console.log('claude-tg bot is running. Waiting for messages...');

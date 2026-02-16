@@ -2,6 +2,6 @@ node_modules/
 .env
 .sessions.json
 .bot.pid
-bot.log
+logs/
 .notify-log.json
 .prompt-state.json

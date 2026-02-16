@@ -9,6 +9,7 @@ const formatter = require('./lib/formatter');
 const sessions = require('./lib/sessions');
 const tmux = require('./lib/tmux');
 const transcript = require('./lib/transcript');
+const { logEvent, logError } = require('./lib/logger');
 
 const NOTIFY_LOG_PATH = path.join(__dirname, '..', '.notify-log.json');
 
@@ -35,6 +36,7 @@ async function main() {
   try {
     hookData = JSON.parse(input);
   } catch (_e) {
+    logError(null, 'failed to parse stdin JSON');
     process.exit(0);
   }
 
@@ -42,6 +44,7 @@ async function main() {
   try {
     cfg = config.loadConfig();
   } catch (_e) {
+    logError(null, 'failed to load config');
     process.exit(0);
   }
 
@@ -51,22 +54,27 @@ async function main() {
 
   const { hook_event_name: eventName, notification_type: notificationType } =
     hookData;
+  const sessionName = findSessionForCwd(hookData.cwd);
 
   if (eventName !== 'Notification') {
     process.exit(0);
   }
   if (notificationType === 'idle_prompt' && !cfg.notifyOn.idle) {
+    logEvent(sessionName, 'idle notification filtered (disabled)');
     process.exit(0);
   }
   if (notificationType === 'permission_prompt' && !cfg.notifyOn.permission) {
+    logEvent(sessionName, 'permission notification filtered (disabled)');
     process.exit(0);
   }
 
   if (notificationType === 'idle_prompt' && !cooldownExpired(cfg, 'lastIdle')) {
+    logEvent(sessionName, 'idle notification filtered (cooldown)');
     process.exit(0);
   }
 
   if (notificationType === 'idle_prompt' && isUserTyping(hookData.cwd)) {
+    logEvent(sessionName, 'idle notification filtered (user typing)');
     process.exit(0);
   }
 
@@ -74,10 +82,10 @@ async function main() {
     notificationType === 'permission_prompt' &&
     !cooldownExpired(cfg, 'lastPermission')
   ) {
+    logEvent(sessionName, 'permission notification filtered (cooldown)');
     process.exit(0);
   }
 
-  const sessionName = findSessionForCwd(hookData.cwd);
   if (sessionName) {
     sessions.setActive(sessionName);
   }
@@ -126,7 +134,13 @@ async function main() {
     showHint,
     isTranscriptContent
   );
-  await telegram.sendMessageWithRetry(cfg.botToken, cfg.chatId, message);
+  try {
+    await telegram.sendMessageWithRetry(cfg.botToken, cfg.chatId, message);
+    logEvent(sessionName, `${notificationType} notification sent`);
+  } catch (err) {
+    logError(sessionName, `telegram send failed: ${err.message}`);
+    process.exit(0);
+  }
 
   const log = loadLog();
   if (notificationType === 'idle_prompt') {
@@ -201,6 +215,7 @@ function findSessionForCwd(cwd) {
   return state.active;
 }
 
-main().catch(() => {
+main().catch((err) => {
+  logError(null, `uncaught error: ${err.message}`);
   process.exit(0);
 });
