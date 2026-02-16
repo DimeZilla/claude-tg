@@ -66,6 +66,10 @@ async function main() {
     process.exit(0);
   }
 
+  if (notificationType === 'idle_prompt' && isUserTyping(hookData.cwd)) {
+    process.exit(0);
+  }
+
   if (
     notificationType === 'permission_prompt' &&
     !cooldownExpired(cfg, 'lastPermission')
@@ -170,6 +174,19 @@ function shouldShowHint() {
   saveLog(log);
 
   return log.timestamps.length >= threshold;
+}
+
+function isUserTyping(cwd) {
+  try {
+    const sessionName = findSessionForCwd(cwd);
+    if (!sessionName) return false;
+    const lastLine = tmux.capturePane(sessionName, 1).trim();
+    // Check if there's text after the ❯ prompt (user is drafting input)
+    const match = lastLine.match(/❯\s?(.+)/);
+    return match !== null && match[1].trim().length > 0;
+  } catch (_e) {
+    return false;
+  }
 }
 
 function findSessionForCwd(cwd) {
