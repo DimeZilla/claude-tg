@@ -73,6 +73,8 @@ bot.on('message', (msg) => {
     handleRename(chatId, text);
   } else if (text === '/help') {
     handleHelp(chatId);
+  } else if (/^\/\d+$/.test(text)) {
+    handleSelectOption(chatId, parseInt(text.slice(1), 10));
   } else {
     handleInput(chatId, text);
   }
@@ -407,6 +409,37 @@ function handleDeny(chatId) {
   }
 }
 
+function handleSelectOption(chatId, optionNum) {
+  const active = getActiveSession();
+  if (!active) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F No active sessions.');
+    return;
+  }
+
+  if (!tmux.sessionExists(active)) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F Session not found.');
+    return;
+  }
+
+  try {
+    // Navigate to top (10 Ups is enough for any menu), then down to target
+    tmux.sendArrowUp(active, 10);
+    if (optionNum > 1) {
+      tmux.sendArrowDown(active, optionNum - 1);
+    }
+    tmux.sendEnter(active);
+    logEvent(active, `selected option ${optionNum}`);
+    bot.sendMessage(
+      chatId,
+      `\u2705 [${formatter.escapeHtml(active)}] Selected option ${optionNum}`,
+      { parse_mode: 'HTML' }
+    );
+  } catch (err) {
+    logError(active, `select option failed: ${err.message}`);
+    bot.sendMessage(chatId, `\u274C Failed: ${err.message}`);
+  }
+}
+
 function handleEscape(chatId) {
   const active = getActiveSession();
   if (!active) {
@@ -439,6 +472,7 @@ function handleHelp(chatId) {
       '',
       '/allow - Approve a permission prompt',
       '/deny - Deny a permission prompt',
+      '/1, /2, ... - Select a numbered option',
       '/stop - Send Ctrl+C to interrupt Claude',
       '/escape - Send Escape key',
       '/status - Show all active sessions',

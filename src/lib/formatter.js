@@ -36,8 +36,8 @@ function formatNotification(
   if (title) parts.push(`<b>${escapeHtml(title)}</b>`);
   if (message) parts.push(escapeHtml(message));
 
+  var displayText = '';
   if (screenContent) {
-    let displayText;
     if (isTranscript) {
       displayText = screenContent;
     } else if (notificationType === 'permission_prompt' || notificationType === 'elicitation_dialog') {
@@ -55,9 +55,26 @@ function formatNotification(
     }
   }
 
+  var options = [];
+  if (
+    !showHint &&
+    (notificationType === 'permission_prompt' ||
+      notificationType === 'elicitation_dialog')
+  ) {
+    options = extractOptions(displayText);
+  }
+
   parts.push('');
   if (showHint) {
     parts.push('<i>Tip: /stop to interrupt, /help for commands</i>');
+  } else if (options.length > 0) {
+    var optLines = options.map(function (o) {
+      return `/<b>${o.number}</b> ${escapeHtml(o.label)}`;
+    });
+    parts.push(optLines.join('\n'));
+    if (notificationType === 'permission_prompt') {
+      parts.push('<i>/deny to reject</i>');
+    }
   } else if (notificationType === 'permission_prompt') {
     parts.push('<i>/allow to approve, /deny to reject</i>');
   } else if (notificationType === 'elicitation_dialog') {
@@ -128,9 +145,24 @@ function extractLastMessage(screen) {
   return result.join('\n').trim();
 }
 
+// Extract numbered options like "❯ 1. Label" or "  2. Label" from dialog text
+function extractOptions(text) {
+  if (!text) return [];
+  var options = [];
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var match = lines[i].match(/(?:❯\s*)?(\d+)\.\s+(.+)/);
+    if (match) {
+      options.push({ number: parseInt(match[1], 10), label: match[2].trim() });
+    }
+  }
+  return options;
+}
+
 module.exports = {
   formatNotification,
   escapeHtml,
   extractPermissionDialog,
   extractLastMessage,
+  extractOptions,
 };

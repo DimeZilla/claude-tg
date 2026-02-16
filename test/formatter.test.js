@@ -4,6 +4,7 @@ const {
   escapeHtml,
   extractPermissionDialog,
   extractLastMessage,
+  extractOptions,
   formatNotification,
 } = require('../src/lib/formatter');
 
@@ -127,6 +128,36 @@ describe('extractLastMessage', () => {
   });
 });
 
+describe('extractOptions', () => {
+  it('parses numbered options from dialog text', () => {
+    const text = [
+      '  ❯ 1. Yes, clear context',
+      '    2. Yes, auto-accept',
+      '    3. Manually approve',
+    ].join('\n');
+
+    const options = extractOptions(text);
+    expect(options).toEqual([
+      { number: 1, label: 'Yes, clear context' },
+      { number: 2, label: 'Yes, auto-accept' },
+      { number: 3, label: 'Manually approve' },
+    ]);
+  });
+
+  it('returns empty array for text with no options', () => {
+    expect(extractOptions('just some text')).toEqual([]);
+    expect(extractOptions('')).toEqual([]);
+    expect(extractOptions(null)).toEqual([]);
+  });
+
+  it('handles options without cursor marker', () => {
+    const text = '  1. First option\n  2. Second option';
+    const options = extractOptions(text);
+    expect(options).toHaveLength(2);
+    expect(options[0].label).toBe('First option');
+  });
+});
+
 describe('formatNotification', () => {
   it('formats permission prompt with correct icon and header', () => {
     const hookData = { notification_type: 'permission_prompt' };
@@ -145,6 +176,37 @@ describe('formatNotification', () => {
     expect(result).toContain('\u2753');
     expect(result).toContain('<b>Question for you</b>');
     expect(result).toContain('Reply with your choice');
+  });
+
+  it('shows numbered option commands for permission prompt with options', () => {
+    const hookData = { notification_type: 'permission_prompt' };
+    const screen = [
+      '──────────────────────',
+      'Would you like to proceed?',
+      '  ❯ 1. Yes, accept all',
+      '    2. No, reject',
+    ].join('\n');
+    const result = formatNotification(hookData, 'sess', screen);
+
+    expect(result).toContain('/<b>1</b> Yes, accept all');
+    expect(result).toContain('/<b>2</b> No, reject');
+    expect(result).toContain('/deny to reject');
+    expect(result).not.toContain('/allow to approve');
+  });
+
+  it('shows numbered option commands for elicitation dialog', () => {
+    const hookData = { notification_type: 'elicitation_dialog' };
+    const screen = [
+      '──────────────────────',
+      'Which approach?',
+      '  ❯ 1. Option A',
+      '    2. Option B',
+    ].join('\n');
+    const result = formatNotification(hookData, 'sess', screen);
+
+    expect(result).toContain('/<b>1</b> Option A');
+    expect(result).toContain('/<b>2</b> Option B');
+    expect(result).not.toContain('/deny');
   });
 
   it('formats idle prompt with hourglass', () => {

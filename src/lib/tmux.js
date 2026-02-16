@@ -54,6 +54,13 @@ function sendEscape(sessionName, targetPane) {
   childProcess.execFileSync('tmux', ['send-keys', '-t', target, 'Escape']);
 }
 
+function sendArrowUp(sessionName, count, targetPane) {
+  const target = targetPane || sessionName;
+  for (let i = 0; i < count; i++) {
+    childProcess.execFileSync('tmux', ['send-keys', '-t', target, 'Up']);
+  }
+}
+
 function sendArrowDown(sessionName, count, targetPane) {
   const target = targetPane || sessionName;
   for (let i = 0; i < count; i++) {
@@ -76,6 +83,7 @@ module.exports = {
   capturePane,
   sendInterrupt,
   sendEscape,
+  sendArrowUp,
   sendArrowDown,
   sendEnter,
   renameSession,
