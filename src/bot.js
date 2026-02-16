@@ -47,9 +47,9 @@ bot.on('message', (msg) => {
   const text = msg.text;
   if (!text) return;
 
-  var active = getActiveSession();
+  const active = getActiveSession();
   if (text.startsWith('/')) {
-    var cmd = text.split(/\s+/)[0];
+    const cmd = text.split(/\s+/)[0];
     logEvent(active, `command: ${cmd}`);
   }
 

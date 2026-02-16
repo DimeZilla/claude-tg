@@ -36,7 +36,7 @@ function formatNotification(
   if (title) parts.push(`<b>${escapeHtml(title)}</b>`);
   if (message) parts.push(escapeHtml(message));
 
-  var displayText = '';
+  let displayText = '';
   if (screenContent) {
     if (isTranscript) {
       displayText = screenContent;
@@ -55,7 +55,7 @@ function formatNotification(
     }
   }
 
-  var options = [];
+  let options = [];
   if (
     !showHint &&
     (notificationType === 'permission_prompt' ||
@@ -68,7 +68,7 @@ function formatNotification(
   if (showHint) {
     parts.push('<i>Tip: /stop to interrupt, /help for commands</i>');
   } else if (options.length > 0) {
-    var optLines = options.map(function (o) {
+    const optLines = options.map(function (o) {
       return `/<b>${o.number}</b> ${escapeHtml(o.label)}`;
     });
     parts.push(optLines.join('\n'));
@@ -146,10 +146,10 @@ function extractLastMessage(screen) {
 // Extract numbered options like "❯ 1. Label" or "  2. Label" from dialog text
 function extractOptions(text) {
   if (!text) return [];
-  var options = [];
-  var lines = text.split('\n');
-  for (var i = 0; i < lines.length; i++) {
-    var match = lines[i].match(/(?:❯\s*)?(\d+)\.\s+(.+)/);
+  const options = [];
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/(?:❯\s*)?(\d+)\.\s+(.+)/);
     if (match) {
       options.push({ number: parseInt(match[1], 10), label: match[2].trim() });
     }

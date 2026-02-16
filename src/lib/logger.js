@@ -16,9 +16,9 @@ function ensureLogsDir() {
 function append(file, session, message) {
   try {
     ensureLogsDir();
-    var timestamp = new Date().toISOString();
-    var label = session || '-';
-    var line = `${timestamp} [${label}] ${message}\n`;
+    const timestamp = new Date().toISOString();
+    const label = session || '-';
+    const line = `${timestamp} [${label}] ${message}\n`;
     fs.appendFileSync(path.join(LOGS_DIR, file), line);
   } catch (_e) {
     // logger must never crash the app

@@ -22,7 +22,7 @@ if (!fs.existsSync(ENV_PATH)) {
 require('dotenv').config({ path: ENV_PATH });
 
 const sessions = require('./lib/sessions');
-const { logEvent, logError } = require('./lib/logger');
+const { logEvent } = require('./lib/logger');
 
 // Parse --name from args, pass the rest through to claude
 const allArgs = process.argv.slice(2);
