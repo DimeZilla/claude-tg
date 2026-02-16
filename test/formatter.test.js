@@ -144,7 +144,7 @@ describe('formatNotification', () => {
 
     expect(result).toContain('\u2753');
     expect(result).toContain('<b>Question for you</b>');
-    expect(result).toContain('Reply here to send input');
+    expect(result).toContain('Reply with your choice');
   });
 
   it('formats idle prompt with hourglass', () => {

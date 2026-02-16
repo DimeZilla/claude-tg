@@ -40,7 +40,7 @@ function formatNotification(
     let displayText;
     if (isTranscript) {
       displayText = screenContent;
-    } else if (notificationType === 'permission_prompt') {
+    } else if (notificationType === 'permission_prompt' || notificationType === 'elicitation_dialog') {
       displayText = extractPermissionDialog(screenContent);
     } else {
       displayText = extractLastMessage(screenContent);
@@ -60,6 +60,8 @@ function formatNotification(
     parts.push('<i>Tip: /stop to interrupt, /help for commands</i>');
   } else if (notificationType === 'permission_prompt') {
     parts.push('<i>/allow to approve, /deny to reject</i>');
+  } else if (notificationType === 'elicitation_dialog') {
+    parts.push('<i>Reply with your choice</i>');
   } else {
     parts.push('<i>Reply here to send input</i>');
   }

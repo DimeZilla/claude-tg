@@ -93,7 +93,7 @@ async function main() {
   let screenContent = '';
   let isTranscriptContent = false;
 
-  if (notificationType === 'permission_prompt') {
+  if (notificationType === 'permission_prompt' || notificationType === 'elicitation_dialog') {
     if (sessionName) {
       try {
         screenContent = tmux.capturePane(sessionName, 50).trim();
