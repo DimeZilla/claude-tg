@@ -65,6 +65,8 @@ bot.on('message', (msg) => {
     handleStatus(chatId);
   } else if (text === '/screen') {
     handleScreen(chatId);
+  } else if (text === '/plan') {
+    handlePlan(chatId);
   } else if (text === '/sessions') {
     handleSessions(chatId);
   } else if (text.startsWith('/switch')) {
@@ -288,6 +290,91 @@ function handleScreen(chatId) {
   }
 }
 
+function handlePlan(chatId) {
+  const active = getActiveSession();
+  if (!active) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F No active sessions.');
+    return;
+  }
+
+  if (!tmux.sessionExists(active)) {
+    bot.sendMessage(chatId, '\u26A0\uFE0F Session not found.');
+    return;
+  }
+
+  try {
+    const output = tmux.capturePane(active, 50);
+    const match = output.match(/~\/\.claude\/plans\/[^\s]+\.md/);
+    if (!match) {
+      bot.sendMessage(
+        chatId,
+        '\u26A0\uFE0F No plan file found in terminal. Is there a plan approval prompt visible?'
+      );
+      return;
+    }
+
+    const planPath = match[0].replace(/^~/, process.env.HOME);
+    const content = fs.readFileSync(planPath, 'utf8').trim();
+    if (!content) {
+      bot.sendMessage(chatId, '<i>Plan file is empty.</i>', {
+        parse_mode: 'HTML',
+      });
+      return;
+    }
+
+    logEvent(active, `viewed plan: ${match[0]}`);
+    sendLongMessage(
+      chatId,
+      `\uD83D\uDCCB [${formatter.escapeHtml(active)}] Plan`,
+      content
+    );
+  } catch (err) {
+    logError(active, `plan read failed: ${err.message}`);
+    bot.sendMessage(chatId, `\u274C Failed to read plan: ${err.message}`);
+  }
+}
+
+function sendLongMessage(chatId, title, content) {
+  const escaped = formatter.escapeHtml(content);
+  const maxChunk = 3800;
+
+  // Try single message first
+  const single = `<b>${title}</b>\n<pre>${escaped}</pre>`;
+  if (single.length <= 4096) {
+    bot.sendMessage(chatId, single, { parse_mode: 'HTML' });
+    return;
+  }
+
+  // Split on line boundaries
+  const lines = escaped.split('\n');
+  const chunks = [];
+  let current = '';
+
+  for (const line of lines) {
+    if (current.length + line.length + 1 > maxChunk && current.length > 0) {
+      chunks.push(current);
+      current = line;
+    } else {
+      current += (current ? '\n' : '') + line;
+    }
+  }
+  if (current) chunks.push(current);
+
+  // Send first chunk with title
+  bot.sendMessage(
+    chatId,
+    `<b>${title}</b>\n<pre>${chunks[0]}</pre>`,
+    { parse_mode: 'HTML' }
+  );
+
+  // Send remaining chunks
+  for (let i = 1; i < chunks.length; i++) {
+    bot.sendMessage(chatId, `<pre>${chunks[i]}</pre>`, {
+      parse_mode: 'HTML',
+    });
+  }
+}
+
 function handleRename(chatId, text) {
   const parts = text.split(/\s+/);
   const newName = parts[1];
@@ -480,6 +567,7 @@ function handleHelp(chatId) {
       '/switch &lt;name&gt; - Switch active session',
       '/rename &lt;name&gt; - Rename the active session',
       '/screen - Show recent terminal output',
+      '/plan - View the current plan',
       '/help - Show this message',
       '',
       'Any other text is sent as input to the ' + 'active Claude session.',
