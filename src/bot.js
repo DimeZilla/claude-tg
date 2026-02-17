@@ -512,8 +512,7 @@ function handleSelectOption(chatId, optionNum) {
   }
 
   try {
-    // Navigate to top (10 Ups is enough for any menu), then down to target
-    tmux.sendArrowUp(active, 10);
+    // Cursor starts on option 1, so send (N-1) Downs then Enter
     if (optionNum > 1) {
       tmux.sendArrowDown(active, optionNum - 1);
     }
