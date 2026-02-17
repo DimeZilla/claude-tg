@@ -511,11 +511,14 @@ function handleSelectOption(chatId, optionNum) {
     return;
   }
 
+  // For option 1, just accept (same as /allow since cursor starts on option 1)
+  if (optionNum === 1) {
+    handleAllow(chatId);
+    return;
+  }
+
   try {
-    // Cursor starts on option 1, so send (N-1) Downs then Enter
-    if (optionNum > 1) {
-      tmux.sendArrowDown(active, optionNum - 1);
-    }
+    tmux.sendArrowDown(active, optionNum - 1);
     tmux.sendEnter(active);
     logEvent(active, `selected option ${optionNum}`);
     bot.sendMessage(
