@@ -96,7 +96,7 @@ async function main() {
   if (notificationType === 'permission_prompt' || notificationType === 'elicitation_dialog') {
     if (sessionName) {
       try {
-        screenContent = tmux.capturePane(sessionName, 50).trim();
+        screenContent = tmux.capturePane(sessionName, 200).trim();
       } catch (_e) {
         // ignore capture failures
       }
