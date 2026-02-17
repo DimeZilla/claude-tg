@@ -204,9 +204,12 @@ function handleStatus(chatId) {
   const lines = [`\uD83D\uDFE2 <b>${names.length} active session(s):</b>`, ''];
   for (const name of names) {
     const alive = tmux.sessionExists(name);
-    const marker = name === info.active ? ' \u25C0 active' : '';
     const icon = alive ? '\uD83D\uDFE2' : '\uD83D\uDD34';
-    lines.push(`${icon} <code>${formatter.escapeHtml(name)}</code>${marker}`);
+    if (name === info.active) {
+      lines.push(`${icon} <code>${formatter.escapeHtml(name)}</code> \u25C0 active`);
+    } else {
+      lines.push(`${icon} <code>/switch ${formatter.escapeHtml(name)}</code>`);
+    }
   }
 
   bot.sendMessage(chatId, lines.join('\n'), {
