@@ -1,7 +1,12 @@
-node_modules/
+# Binary
+claude-tg
+
+# State files
 .env
 .sessions.json
 .bot.pid
-logs/
 .notify-log.json
 .prompt-state.json
+
+# Logs
+logs/

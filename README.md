@@ -17,29 +17,76 @@ Claude Code runs in a terminal and frequently needs human input: permission appr
 - **Screen capture** — view recent terminal output with `/screen`
 - **Photo support** — send screenshots to Claude for visual context
 - **Notification throttling** — configurable cooldown to prevent spam
+- **Single static binary** — no runtime dependencies, works with any system configuration
 
 ## Requirements
 
-- Node.js >= 18
+- [Go](https://go.dev/dl/) >= 1.21 (build only)
 - [tmux](https://github.com/tmux/tmux)
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
 - A Telegram bot token (from [@BotFather](https://t.me/BotFather))
 
 ## Installation
 
+### Quick install
+
 ```bash
 git clone https://github.com/yourusername/claude-tg.git
 cd claude-tg
-npm install
-npm run setup
-npm link
+make install
+claude-tg setup
 ```
 
-The setup wizard will:
+`make install` builds the binary and copies it to `/usr/local/bin/`, making it available globally. You may need `sudo`:
+
+```bash
+sudo make install
+```
+
+### Custom install location
+
+```bash
+make install PREFIX=~/.local  # installs to ~/.local/bin/claude-tg
+```
+
+Make sure `~/.local/bin` is in your `PATH`. Add this to your `~/.bashrc` or `~/.zshrc` if needed:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Build without installing
+
+```bash
+make build   # produces ./claude-tg in the project directory
+```
+
+### Uninstall
+
+```bash
+sudo make uninstall               # removes from /usr/local/bin
+make uninstall PREFIX=~/.local    # or wherever you installed it
+```
+
+### Setup
+
+The setup wizard configures your bot token and installs Claude Code hooks:
+
+```bash
+claude-tg setup
+```
+
+This will:
 
 1. Ask for your Telegram bot token
 2. Create a `.env` configuration file
 3. Install Claude Code hooks in `~/.claude/settings.json`
+
+If you're upgrading from the Node.js version, run this instead to keep your existing `.env`:
+
+```bash
+claude-tg install-hooks
+```
 
 ## Usage
 
@@ -91,9 +138,11 @@ Use `/switch` and `/sessions` in Telegram to manage them.
 |---------|-------------|
 | `/allow` | Approve a permission prompt |
 | `/deny` | Deny a permission prompt |
+| `/1` `/2` `/3` | Select a numbered option |
 | `/stop` | Send Ctrl+C to interrupt Claude |
 | `/escape` | Send Escape key |
 | `/screen` | Show recent terminal output |
+| `/plan` | View the current plan file |
 | `/status` | List all active sessions |
 | `/sessions` | Same as `/status` |
 | `/switch <name>` | Switch active session |
@@ -102,7 +151,7 @@ Use `/switch` and `/sessions` in Telegram to manage them.
 
 Any other text you send is forwarded as input to the active Claude session.
 
-You can also send photos — they're saved to the session's working directory and Claude is told to look at the file.
+You can also send photos — they're saved locally and Claude is told to look at the file.
 
 ## Configuration
 
@@ -120,21 +169,21 @@ Settings live in `.env`:
 ## How It Works
 
 ```
-┌─────────────┐     hooks (stdin JSON)     ┌────────────┐
-│ Claude Code  │ ─────────────────────────▶ │  notify.js │
-│  (in tmux)   │                            └─────┬──────┘
-└──────▲───────┘                                  │
+┌─────────────┐     hooks (stdin JSON)     ┌─────────────┐
+│ Claude Code  │ ─────────────────────────▶ │ claude-tg   │
+│  (in tmux)   │                            │   notify    │
+└──────▲───────┘                            └─────┬───────┘
        │ sendKeys/capturePane                     │ HTTPS
        │                                          ▼
 ┌──────┴───────┐     long polling          ┌────────────┐
-│   bot.js     │ ◀───────────────────────▶ │  Telegram   │
-│ (background) │                            │    API      │
+│  claude-tg   │ ◀───────────────────────▶ │  Telegram   │
+│    bot       │                            │    API      │
 └──────────────┘                            └────────────┘
 ```
 
-1. **`claude-tg` (cli.js)** launches Claude Code inside a tmux session and starts the bot process
-2. **Claude Code hooks** fire `notify.js` when Claude needs attention, which sends a Telegram message
-3. **`bot.js`** polls Telegram for your replies and forwards them to the tmux session via `sendKeys`
+1. **`claude-tg`** launches Claude Code inside a tmux session and starts the bot process
+2. **Claude Code hooks** fire `claude-tg notify` when Claude needs attention, which sends a Telegram message
+3. **`claude-tg bot`** polls Telegram for your replies and forwards them to the tmux session via `sendKeys`
 4. When the last session exits, the bot shuts itself down
 
 ## Security
@@ -147,13 +196,13 @@ Settings live in `.env`:
 ## Troubleshooting
 
 **Bot not responding?**
-- Check `bot.log` for errors
+- Check `logs/bot.log` for errors
 - Make sure only one bot instance is running (error 409 = duplicate)
 - Verify your `.env` has the correct `BOT_TOKEN`
 
 **Not getting notifications?**
 - Confirm hooks are installed: check `~/.claude/settings.json` for claude-tg entries
-- Re-run `npm run setup` to reinstall hooks
+- Run `claude-tg install-hooks` to reinstall hooks
 - Check that `NOTIFY_ON_*` settings are `true` in `.env`
 - Lower `IDLE_COOLDOWN` if notifications feel too sparse
 
