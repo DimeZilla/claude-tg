@@ -3,6 +3,7 @@ package tmux
 import (
 	"fmt"
 	"os/exec"
+	"time"
 )
 
 func SessionExists(name string) bool {
@@ -62,6 +63,7 @@ func SendArrowDown(sessionName string, count int, targetPane string) error {
 		if err := exec.Command("tmux", "send-keys", "-t", target, "Down").Run(); err != nil {
 			return err
 		}
+		time.Sleep(50 * time.Millisecond)
 	}
 	return nil
 }

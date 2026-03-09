@@ -367,10 +367,23 @@ func handleSelectOption(client *telegram.Client, chatID, text string) {
 		handleAllow(client, chatID)
 		return
 	}
+	// Move cursor down to the desired option with delays for TUI to register
 	tmux.SendArrowDown(active, num-1, "")
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
 	tmux.SendEnter(active, "")
-	client.SendMessage(chatID, fmt.Sprintf("Selected option %d ✓", num), "")
+
+	// Brief pause then capture screen to show what happened
+	time.Sleep(500 * time.Millisecond)
+	content, err := tmux.CapturePane(active, 10, "")
+	if err != nil || content == "" {
+		client.SendMessage(chatID, fmt.Sprintf("Selected option %d ✓", num), "")
+		return
+	}
+	// Show last few lines so user can verify the selection took effect
+	if len(content) > 1500 {
+		content = content[len(content)-1500:]
+	}
+	client.SendMessage(chatID, fmt.Sprintf("Selected option %d ✓\n\n<pre>%s</pre>", num, formatter.EscapeHTML(content)), "HTML")
 }
 
 func handleEscape(client *telegram.Client, chatID string) {
