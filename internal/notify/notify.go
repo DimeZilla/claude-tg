@@ -210,11 +210,12 @@ func run() error {
 		return nil
 	}
 
-	// Find session and set active
+	// Find session and set active — skip if not a claude-tg session
 	sessionName := sessions.FindByCwd(hookData.Cwd)
-	if sessionName != "" {
-		sessions.SetActive(sessionName)
+	if sessionName == "" {
+		return nil
 	}
+	sessions.SetActive(sessionName)
 
 	// Capture content
 	var screenContent string
