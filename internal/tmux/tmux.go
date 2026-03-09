@@ -54,6 +54,20 @@ func SendEscape(sessionName, targetPane string) error {
 	return exec.Command("tmux", "send-keys", "-t", target, "Escape").Run()
 }
 
+func SendArrowUp(sessionName string, count int, targetPane string) error {
+	target := sessionName
+	if targetPane != "" {
+		target = targetPane
+	}
+	for i := 0; i < count; i++ {
+		if err := exec.Command("tmux", "send-keys", "-t", target, "Up").Run(); err != nil {
+			return err
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return nil
+}
+
 func SendArrowDown(sessionName string, count int, targetPane string) error {
 	target := sessionName
 	if targetPane != "" {

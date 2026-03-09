@@ -352,6 +352,8 @@ func handleDeny(client *telegram.Client, chatID string) {
 	client.SendMessage(chatID, "Denied ✗", "")
 }
 
+var cursorRegex = regexp.MustCompile(`❯\s*(\d+)\.`)
+
 func handleSelectOption(client *telegram.Client, chatID, text string) {
 	matches := optionRegex.FindStringSubmatch(text)
 	if matches == nil {
@@ -363,12 +365,25 @@ func handleSelectOption(client *telegram.Client, chatID, text string) {
 		client.SendMessage(chatID, "No active session.", "")
 		return
 	}
-	if num == 1 {
-		handleAllow(client, chatID)
-		return
+
+	// Capture screen to find current cursor position
+	currentPos := 1 // default assumption
+	screen, err := tmux.CapturePane(active, 20, "")
+	if err == nil {
+		if m := cursorRegex.FindStringSubmatch(screen); m != nil {
+			if pos, err := strconv.Atoi(m[1]); err == nil {
+				currentPos = pos
+			}
+		}
 	}
-	// Move cursor down to the desired option with delays for TUI to register
-	tmux.SendArrowDown(active, num-1, "")
+
+	// Calculate exact movement from current position to target
+	delta := num - currentPos
+	if delta > 0 {
+		tmux.SendArrowDown(active, delta, "")
+	} else if delta < 0 {
+		tmux.SendArrowUp(active, -delta, "")
+	}
 	time.Sleep(150 * time.Millisecond)
 	tmux.SendEnter(active, "")
 
@@ -379,7 +394,6 @@ func handleSelectOption(client *telegram.Client, chatID, text string) {
 		client.SendMessage(chatID, fmt.Sprintf("Selected option %d ✓", num), "")
 		return
 	}
-	// Show last few lines so user can verify the selection took effect
 	if len(content) > 1500 {
 		content = content[len(content)-1500:]
 	}
@@ -394,6 +408,37 @@ func handleEscape(client *telegram.Client, chatID string) {
 	}
 	tmux.SendEscape(active, "")
 	client.SendMessage(chatID, "Sent Escape", "")
+}
+
+func findTranscriptPath(cwd string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	// Claude Code stores transcripts in ~/.claude/projects/<encoded-cwd>/
+	encoded := strings.ReplaceAll(cwd, "/", "-")
+	dir := filepath.Join(home, ".claude", "projects", encoded)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	// Find most recent .jsonl file
+	var newest string
+	var newestTime int64
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().UnixNano() > newestTime {
+			newestTime = info.ModTime().UnixNano()
+			newest = filepath.Join(dir, e.Name())
+		}
+	}
+	return newest
 }
 
 func handleHelp(client *telegram.Client, chatID string) {
