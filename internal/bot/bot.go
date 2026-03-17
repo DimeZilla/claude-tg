@@ -235,7 +235,7 @@ func handleScreen(client *telegram.Client, chatID string) {
 		return
 	}
 	if len(content) > 3800 {
-		content = content[:3800] + "..."
+		content = "..." + content[len(content)-3800:]
 	}
 	client.SendMessage(chatID, fmt.Sprintf("<pre>%s</pre>", formatter.EscapeHTML(content)), "HTML")
 }
